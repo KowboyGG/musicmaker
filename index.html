@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MusicMaker</title>
+<meta name="description" content="Генератор музыки для игр и видео: жанры, аранжировка, редактор нот, JSON для правок через ИИ, экспорт WAV и MIDI.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">MusicMaker</span>
+    </div>
+    <div class="transport" role="group" aria-label="Воспроизведение">
+      <button class="btn btn-play" id="btn-play" type="button" title="Играть / стоп (пробел)">
+        <svg class="ico-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg>
+        <svg class="ico-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+        <span class="btn-play-label">Играть</span>
+      </button>
+      <div class="seg" role="radiogroup" aria-label="Что играть">
+        <button type="button" class="seg-btn" id="mode-song" role="radio" aria-checked="true">Всю песню</button>
+        <button type="button" class="seg-btn" id="mode-section" role="radio" aria-checked="false">Секцию по кругу</button>
+      </div>
+      <label class="check" title="Начинать сначала, когда песня закончилась">
+        <input type="checkbox" id="loop-song"> <span>Повтор</span>
+      </label>
+    </div>
+    <div class="lcd" aria-live="off">
+      <span class="lcd-time" id="lcd-time">0:00 / 0:00</span>
+      <span class="lcd-pos" id="lcd-pos">такт 1</span>
+    </div>
+    <div class="song-params">
+      <label class="field-inline" for="song-bpm">Темп <input id="song-bpm" type="number" min="30" max="300" step="1"></label>
+      <label class="field-inline" for="song-key">Тоника <select id="song-key"></select></label>
+      <label class="field-inline" for="song-scale">Лад <select id="song-scale"></select></label>
+    </div>
+    <div class="top-actions">
+      <button class="btn btn-ghost" id="btn-undo" type="button" title="Отменить (Ctrl+Z)" aria-label="Отменить">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H4v5M4 12a8 8 0 1 1 2.3 5.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn btn-ghost" id="btn-redo" type="button" title="Вернуть (Ctrl+Shift+Z)" aria-label="Вернуть">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7h5v5M20 12a8 8 0 1 0-2.3 5.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn" id="btn-json" type="button">JSON и ИИ</button>
+      <div class="menu-wrap">
+        <button class="btn btn-accent" id="btn-export" type="button" aria-haspopup="menu" aria-expanded="false">Экспорт</button>
+        <div class="menu" id="menu-export" role="menu" hidden>
+          <button type="button" role="menuitem" data-export="wav"><b>WAV</b><span>Вся песня, для видео</span></button>
+          <button type="button" role="menuitem" data-export="loop"><b>WAV-луп</b><span>Бесшовный повтор, для игр</span></button>
+          <button type="button" role="menuitem" data-export="stems"><b>Стемы (ZIP)</b><span>Каждая дорожка отдельным лупом</span></button>
+          <button type="button" role="menuitem" data-export="midi"><b>MIDI</b><span>Для FL Studio, Reaper, Ableton</span></button>
+          <button type="button" role="menuitem" data-export="json"><b>JSON-файл</b><span>Сохранить проект</span></button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="btn-help" type="button" aria-label="Как пользоваться">?</button>
+    </div>
+  </header>
+
+  <aside class="gen" id="gen" aria-label="Генератор">
+    <div class="gen-head">
+      <h2>Генератор</h2>
+      <button class="btn btn-ghost gen-toggle" id="gen-toggle" type="button" aria-expanded="true">Свернуть</button>
+    </div>
+    <div class="gen-body" id="gen-body">
+      <label class="field" for="gen-style">Жанр
+        <select id="gen-style"></select>
+      </label>
+      <p class="hint" id="gen-style-desc"></p>
+      <div class="field-row">
+        <label class="field" for="gen-mood">Настроение
+          <select id="gen-mood">
+            <option value="auto">Как в жанре</option>
+            <option value="bright">Светлое</option>
+            <option value="dark">Тёмное</option>
+          </select>
+        </label>
+        <label class="field" for="gen-length">Длина
+          <select id="gen-length"></select>
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field" for="gen-bpm">Темп
+          <input id="gen-bpm" type="number" min="30" max="300" placeholder="авто">
+        </label>
+        <label class="field" for="gen-key">Тоника
+          <select id="gen-key"></select>
+        </label>
+      </div>
+      <label class="field" for="gen-energy">Энергия <span class="field-note" id="gen-energy-label">средняя</span>
+        <input id="gen-energy" type="range" min="0" max="1" step="0.05" value="0.5">
+      </label>
+      <div class="blocks">
+        <div class="blocks-head">
+          <span>Блоки</span>
+          <span class="hint">галочка — участвует в песне</span>
+        </div>
+        <div id="gen-roles" class="roles"></div>
+        <div class="add-role">
+          <select id="gen-add-role" aria-label="Добавить блок">
+            <option value="">+ Добавить блок…</option>
+          </select>
+        </div>
+      </div>
+      <label class="field" for="gen-seed">Номер варианта (seed)
+        <input id="gen-seed" type="number" min="1" placeholder="случайный">
+      </label>
+      <div class="gen-actions">
+        <button class="btn btn-accent btn-wide" id="btn-generate" type="button">Сгенерировать песню</button>
+        <button class="btn btn-wide" id="btn-develop" type="button" title="Выделенная секция станет припевом, остальное достроится вокруг неё">Развить мою идею</button>
+        <button class="btn btn-ghost btn-wide" id="btn-empty" type="button">Пустой проект для наброска</button>
+      </div>
+      <p class="hint">«Развить идею»: нарисуйте в секции пару тактов (ритм, мелодию или бас), выделите её и нажмите кнопку. Набросок станет припевом, остальное достроится вокруг него.</p>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <section class="song-head">
+      <input class="song-title" id="song-title" aria-label="Название песни" maxlength="120">
+      <span class="song-meta" id="song-meta"></span>
+    </section>
+
+    <section class="arr" aria-label="Аранжировка">
+      <div class="arr-scroll" id="arr-scroll">
+        <div class="grid" id="grid"></div>
+      </div>
+      <div class="arr-actions">
+        <button class="btn btn-ghost" id="btn-add-track" type="button">+ Дорожка</button>
+        <button class="btn btn-ghost" id="btn-add-section" type="button">+ Секция</button>
+      </div>
+    </section>
+
+    <section class="editor" id="editor" aria-label="Редактор"></section>
+  </main>
+
+  <div class="drawer" id="drawer" hidden>
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div class="drawer-head">
+        <h2 id="drawer-title">JSON и правки через ИИ</h2>
+        <button class="btn btn-ghost" id="drawer-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <ol class="steps">
+        <li>Нажмите «Скопировать для ИИ». Скопируются инструкция к формату и сама песня.</li>
+        <li>Вставьте это в чат с ИИ (Claude, ChatGPT и т.п.) и допишите, что поменять. Например: «сделай вступление тише и добавь в припев струнные».</li>
+        <li>Скопируйте ответ целиком, вставьте в поле ниже и нажмите «Применить». Лишний текст вокруг JSON не страшен.</li>
+      </ol>
+      <div class="drawer-actions">
+        <button class="btn btn-accent" id="json-copy-ai" type="button">Скопировать для ИИ</button>
+        <button class="btn" id="json-copy" type="button">Скопировать JSON</button>
+        <button class="btn" id="json-open" type="button">Открыть файл…</button>
+        <input type="file" id="json-file" accept=".json,application/json,text/plain" hidden>
+      </div>
+      <textarea id="json-text" spellcheck="false" aria-label="JSON песни"></textarea>
+      <div class="drawer-foot">
+        <div class="json-warn" id="json-warn" role="status"></div>
+        <button class="btn btn-accent" id="json-apply" type="button">Применить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer" id="help" hidden>
+    <div class="drawer-panel help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <div class="drawer-head">
+        <h2 id="help-title">Как пользоваться</h2>
+        <button class="btn btn-ghost" id="help-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="help-body">
+        <h3>Быстрый старт</h3>
+        <p>Выберите жанр слева и нажмите «Сгенерировать песню», затем «Играть». Не понравилось — жмите ещё раз, каждый раз получается новый вариант. Номер варианта (seed) повторяет понравившуюся песню.</p>
+        <h3>Сетка аранжировки</h3>
+        <p>Столбцы — секции песни (вступление, куплет, припев…), строки — дорожки. Нажмите на клетку, чтобы открыть её в редакторе снизу. Секция с одним id может звучать несколько раз: правка применяется ко всем повторам.</p>
+        <h3>Редактор</h3>
+        <p>В нотах: нажмите на пустое место и протяните вправо, чтобы нарисовать ноту. Нажмите на ноту, чтобы удалить её. Перетащите ноту, чтобы сдвинуть, а за правый край — чтобы изменить длину. В ударных: клик ставит или убирает удар, Shift+клик — акцент, Alt+клик — тихий удар. Кнопка «Новая партия» переписывает дорожку в этой секции под её аккорды.</p>
+        <h3>Для игр</h3>
+        <p>Выберите длину «Луп» и экспортируйте «WAV-луп»: хвост реверберации переносится в начало, и файл повторяется без щелчка. «Стемы» дают каждую дорожку отдельным лупом: в игре их можно включать по одной, по мере роста напряжения.</p>
+        <h3>Горячие клавиши</h3>
+        <p><kbd>Пробел</kbd> — играть или стоп, <kbd>Ctrl</kbd>+<kbd>Z</kbd> — отменить, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> — вернуть.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="busy" id="busy" hidden>
+    <div class="busy-card" role="status">
+      <div class="busy-title" id="busy-title">Рендер…</div>
+      <div class="meter"><div class="meter-fill" id="busy-fill"></div></div>
+    </div>
+  </div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
